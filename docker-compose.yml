@@ -1,0 +1,16 @@
+version: '3'
+services:
+  livekit:
+    image: livekit/livekit-server:latest
+    command:
+      - --port=7880
+      - --rtc.use_mdns=false
+      - --rtc.port_range_start=5000
+      - --rtc.port_range_end=6000
+      - --rtc.use_external_ip=true
+      - --rtc.enable_stun=true
+      - --keys.devkey=secret
+    ports:
+      - "7880:7880"                     # HTTP API
+      - "7881:7881"                     # WebSocket signaling
+      - "5000-6000:5000-6000/udp"       # WebRTC media transport
