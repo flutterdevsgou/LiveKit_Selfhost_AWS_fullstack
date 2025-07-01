@@ -1,32 +1,32 @@
-
 # 📡 LiveKit Self-Hosted Server (Docker Setup)
 
-This guide helps you deploy your **own LiveKit signaling and media server** using Docker, without relying on LiveKit Cloud.
+Deploy your **own LiveKit signaling and media server** using Docker on Ubuntu.
 
 ---
 
 ## 🚀 What is LiveKit?
 
-[LiveKit](https://livekit.io) is an open-source WebRTC platform for building scalable, real-time audio and video applications.
+[LiveKit](https://livekit.io) is an open-source WebRTC platform for scalable, real-time audio and video apps.
 
-With this setup, you can:
+This guide helps you:
 
-- Host your own signaling/media server.
-- Use custom frontends (like LiveKit Meet or your own React app).
-- Avoid third-party cloud signaling infrastructure.
+- Host your own LiveKit signaling/media server
+- Avoid third-party cloud infrastructure
+- Use custom frontends (e.g., LiveKit Meet or React app)
 
 ---
 
-## ⚙️ Requirements
+## ✅ Requirements
 
-- Ubuntu server (e.g., EC2, VPS)
+- Ubuntu 20.04 or later (EC2/VPS recommended)
 - Docker & Docker Compose
 - Public IP address
 - Open ports (7880, 7881, 5000–6000 UDP)
+- UFW (firewall)
 
 ---
 
-## 📦 Step 1: Install Docker and Docker Compose
+## 📦 Step 1: Install Docker & Docker Compose
 
 ```bash
 sudo apt update
@@ -37,29 +37,52 @@ sudo systemctl start docker
 
 ---
 
-## 🛠️ Step 2: Create LiveKit Server Folder and `docker-compose.yml`
+## 🗂️ Step 2: Create Project Directory
 
 ```bash
-mkdir livekit-server
-cd livekit-server
+mkdir ~/livekit-server
+cd ~/livekit-server
+```
+
+---
+
+## 📄 Step 3: Create `livekit.yaml` Configuration
+
+```bash
+nano livekit.yaml
+```
+
+Paste:
+
+```yaml
+port: 7880
+rtc:
+  port_range_start: 5000
+  port_range_end: 6000
+  use_external_ip: true
+  use_mdns: false
+keys:
+  devkey: secret
+```
+
+---
+
+## ⚙️ Step 4: Create `docker-compose.yml`
+
+```bash
 nano docker-compose.yml
 ```
 
-Paste the following into the file:
+Paste:
 
 ```yaml
 version: '3'
 services:
   livekit:
     image: livekit/livekit-server:latest
-    command:
-      - --port=7880
-      - --rtc.use_mdns=false
-      - --rtc.port_range_start=5000
-      - --rtc.port_range_end=6000
-      - --rtc.use_external_ip=true
-      - --rtc.enable_stun=true
-      - --keys.devkey=secret
+    command: --config /etc/livekit.yaml
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml
     ports:
       - "7880:7880"
       - "7881:7881"
@@ -67,13 +90,12 @@ services:
     restart: always
 ```
 
-Save and exit: `Ctrl + O`, `Enter`, then `Ctrl + X`
-
 ---
 
-## 🔓 Step 3: Open Firewall Ports
+## 🔓 Step 5: Open Firewall Ports
 
-### UFW (Ubuntu):
+### UFW:
+
 ```bash
 sudo ufw allow 22/tcp
 sudo ufw allow 7880/tcp
@@ -83,42 +105,72 @@ sudo ufw enable
 ```
 
 ### EC2 (AWS):
-Add inbound rules in the EC2 Security Group:
 
-- TCP: 22, 7880, 7881 (source: 0.0.0.0/0 or your IP)
-- UDP: 5000–6000 (source: 0.0.0.0/0 or your IP)
+Update EC2 Security Group:
+
+- TCP: 22, 7880, 7881 (source: 0.0.0.0/0)
+- UDP: 5000–6000 (source: 0.0.0.0/0)
 
 ---
 
-## ▶️ Step 4: Run LiveKit Server
+## ▶️ Step 6: Run LiveKit Server
 
 ```bash
 export COMPOSE_HTTP_TIMEOUT=300
-sudo docker-compose up -d
-docker ps   # Confirm container is running
+sudo docker-compose up -d --force-recreate
+docker ps
 ```
 
-Test LiveKit API by visiting:
+Test:
 ```
 http://<your-public-ip>:7880
 ```
 
 ---
 
-## 🧪 Step 5: Use LiveKit Meet with Your Server
+## ✅ Step 7: Check LiveKit Is Running
+
+```bash
+curl http://localhost:7880
+```
+
+Expected output:
+
+```json
+{"ok":true,"message":"LiveKit is running"}
+```
+
+---
+
+## 🧪 Step 8: Debugging Tips
+
+View logs:
+
+```bash
+sudo docker-compose logs livekit --tail=50
+```
+
+Stop stuck containers:
+
+```bash
+sudo docker rm -f livekit-server_livekit_1
+```
+
+---
+
+## 🧪 Step 9: Use LiveKit Meet with Your Server
 
 ### 1. Clone LiveKit Meet:
+
 ```bash
 git clone https://github.com/livekit/livekit-meet
 cd livekit-meet
 curl -fsSL https://get.pnpm.io/install.sh | sh -
 export PATH="$HOME/.local/share/pnpm:$PATH"
-pnpm install  # or npm install
+pnpm install
 ```
 
-### 2. Configure `.env`:
-
-Create `.env` file:
+### 2. Create `.env` File:
 
 ```env
 VITE_LIVEKIT_URL=wss://<your-public-ip>:7881
@@ -126,60 +178,62 @@ VITE_API_KEY=devkey
 VITE_API_SECRET=secret
 ```
 
-### 3. Start LiveKit Meet:
+### 3. Start Development Server:
+
 ```bash
 pnpm dev
 ```
 
-Open your browser:
+Open in browser:
+
 ```
 http://localhost:5173
 ```
 
 ---
 
-## 🛡️ Production Tips
+## 🛡️ Production Best Practices
 
-### ✅ Use SSL (HTTPS)
-Use Nginx or Caddy with Let's Encrypt SSL.
+### 🔐 Use HTTPS (SSL)
 
-### ✅ Change API Keys
-Do not use `devkey` and `secret` in production:
+Use Nginx or Caddy with Let's Encrypt to proxy and secure traffic:
+- Ports 80/443 on your server
+- Proxy to ports 7880 (HTTP) and 7881 (WS)
+
+### 🔑 Change API Keys
+
+Avoid using `devkey`/`secret` in production:
 
 ```yaml
---keys.my_custom_key=my_super_secret_value
+keys:
+  my_custom_key: my_super_secret_value
 ```
 
-### ✅ Auto-Restart
+Update frontend `.env` accordingly.
+
+### 🔁 Auto-Restart Server
+
+Already handled in Docker with:
+
 ```yaml
 restart: always
 ```
 
 ---
 
-export COMPOSE_HTTP_TIMEOUT=200
-
-# sudo docker ps   
-# sudo docker-compose down
-# sudo docker-compose pull
-# sudo docker-compose up -d
-
-
-
-
 ## 📚 LiveKit Ports Summary
 
-| Port | Protocol | Description |
-|------|----------|-------------|
-| 7880 | TCP      | HTTP API / dashboard |
-| 7881 | TCP      | WebSocket signaling |
-| 5000–6000 | UDP | Media (WebRTC) |
+| Port       | Protocol | Description           |
+|------------|----------|-----------------------|
+| 7880       | TCP      | HTTP API / Dashboard  |
+| 7881       | TCP      | WebSocket signaling   |
+| 5000–6000  | UDP      | Media transport (WebRTC) |
 
 ---
 
-## 🧼 Fixing File Permissions (VS Code Issue)
+## 🧼 VS Code File Permissions Fix
 
-If you get permission errors while editing files:
+If you see file permission errors:
 
 ```bash
 sudo chown -R $(whoami):$(whoami) .
@@ -188,22 +242,27 @@ chmod -R u+rw .
 
 ---
 
-## 📎 Resources
-
-- [LiveKit Docs](https://docs.livekit.io/)
-- [LiveKit GitHub](https://github.com/livekit)
-- [LiveKit Meet](https://github.com/livekit/livekit-meet)
-
----
-
 ## 🧠 Want to Build Your Own Frontend?
 
 Use LiveKit SDKs:
 
-- React: [`@livekit/components-react`](https://docs.livekit.io/client-sdk/react/)
-- JS/TS: [`@livekit/client`](https://docs.livekit.io/client-sdk/js/)
+### React SDK:
+
+```bash
+npm install @livekit/components-react
+```
+
+### JS SDK:
+
+```bash
+npm install @livekit/client
+```
+
+### Sample usage:
 
 ```js
+import { connect } from '@livekit/client';
+
 const room = await connect('wss://your-ip:7881', {
   token: '<generated-token>',
 });
@@ -211,6 +270,32 @@ const room = await connect('wss://your-ip:7881', {
 
 ---
 
+## 🧾 Helpful Commands
+
+```bash
+# Stop containers
+sudo docker-compose down
+
+# Pull latest image
+sudo docker-compose pull
+
+# Restart server
+sudo docker-compose up -d
+
+# View running containers
+docker ps
+```
+
+---
+
+## 📎 Resources
+
+- 🌐 [LiveKit Docs](https://docs.livekit.io/)
+- 💻 [LiveKit GitHub](https://github.com/livekit)
+- 🧪 [LiveKit Meet](https://github.com/livekit/livekit-meet)
+
+---
+
 ## ✅ Done!
 
-You now have a fully working self-hosted LiveKit server ready to handle scalable, low-latency real-time audio/video streams 🚀
+🎉 You now have a fully working self-hosted LiveKit server, ready for real-time audio/video communication. Build your own platform confidently!
