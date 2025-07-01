@@ -159,10 +159,10 @@ restart: always
 
 export COMPOSE_HTTP_TIMEOUT=200
 
-sudo docker ps
-sudo docker-compose down
-sudo docker-compose pull
-sudo docker-compose up -d
+# sudo docker ps   
+# sudo docker-compose down
+# sudo docker-compose pull
+# sudo docker-compose up -d
 
 
 
