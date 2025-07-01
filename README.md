@@ -26,19 +26,28 @@ With this setup, you can:
 
 ---
 
-## 📦 Step 1: Install Docker
+## 📦 Step 1: Install Docker and Docker Compose
 
-\`\`\`bash
+```bash
 sudo apt update
-sudo apt install docker.io docker-compose -y
+sudo apt install -y docker.io docker-compose curl git
 sudo systemctl enable docker
-\`\`\`
+sudo systemctl start docker
+```
 
 ---
 
-## 🛠️ Step 2: Create `docker-compose.yml`
+## 🛠️ Step 2: Create LiveKit Server Folder and `docker-compose.yml`
 
-\`\`\`yaml
+```bash
+mkdir livekit-server
+cd livekit-server
+nano docker-compose.yml
+```
+
+Paste the following into the file:
+
+```yaml
 version: '3'
 services:
   livekit:
@@ -52,92 +61,99 @@ services:
       - --rtc.enable_stun=true
       - --keys.devkey=secret
     ports:
-      - "7880:7880"                     # HTTP API
-      - "7881:7881"                     # WebSocket signaling
-      - "5000-6000:5000-6000/udp"       # WebRTC media transport
-\`\`\`
+      - "7880:7880"
+      - "7881:7881"
+      - "5000-6000:5000-6000/udp"
+    restart: always
+```
+
+Save and exit: `Ctrl + O`, `Enter`, then `Ctrl + X`
 
 ---
 
 ## 🔓 Step 3: Open Firewall Ports
 
 ### UFW (Ubuntu):
-\`\`\`bash
+```bash
+sudo ufw allow 22/tcp
 sudo ufw allow 7880/tcp
 sudo ufw allow 7881/tcp
 sudo ufw allow 5000:6000/udp
-\`\`\`
+sudo ufw enable
+```
 
 ### EC2 (AWS):
-Add inbound rules for:
-- TCP: 7880, 7881
-- UDP: 5000–6000
+Add inbound rules in the EC2 Security Group:
+
+- TCP: 22, 7880, 7881 (source: 0.0.0.0/0 or your IP)
+- UDP: 5000–6000 (source: 0.0.0.0/0 or your IP)
 
 ---
 
 ## ▶️ Step 4: Run LiveKit Server
 
-\`\`\`bash
+```bash
+export COMPOSE_HTTP_TIMEOUT=300
 sudo docker-compose up -d
 docker ps   # Confirm container is running
-\`\`\`
+```
 
-Access the LiveKit server at:
-\`\`\`
+Test LiveKit API by visiting:
+```
 http://<your-public-ip>:7880
-\`\`\`
+```
 
 ---
 
 ## 🧪 Step 5: Use LiveKit Meet with Your Server
 
 ### 1. Clone LiveKit Meet:
-\`\`\`bash
+```bash
 git clone https://github.com/livekit/livekit-meet
 cd livekit-meet
+curl -fsSL https://get.pnpm.io/install.sh | sh -
+export PATH="$HOME/.local/share/pnpm:$PATH"
 pnpm install  # or npm install
-\`\`\`
+```
 
 ### 2. Configure `.env`:
 
-Create a `.env` file in the project root:
+Create `.env` file:
 
-\`\`\`env
+```env
 VITE_LIVEKIT_URL=wss://<your-public-ip>:7881
 VITE_API_KEY=devkey
 VITE_API_SECRET=secret
-\`\`\`
+```
 
 ### 3. Start LiveKit Meet:
-\`\`\`bash
+```bash
 pnpm dev
-\`\`\`
+```
 
-Open in browser:
-\`\`\`
+Open your browser:
+```
 http://localhost:5173
-\`\`\`
-
-You’ll now be using your **own LiveKit server**!
+```
 
 ---
 
 ## 🛡️ Production Tips
 
 ### ✅ Use SSL (HTTPS)
-Use a reverse proxy like **Nginx** or **Caddy** and install SSL via Let’s Encrypt.
+Use Nginx or Caddy with Let's Encrypt SSL.
 
 ### ✅ Change API Keys
 Do not use `devkey` and `secret` in production:
-\`\`\`yaml
+
+```yaml
 --keys.my_custom_key=my_super_secret_value
-\`\`\`
+```
 
 ### ✅ Auto-Restart
-For uptime:
-\`\`\`yaml
+```yaml
 restart: always
-\`\`\`
+```
 
 ---
 
@@ -153,12 +169,12 @@ restart: always
 
 ## 🧼 Fixing File Permissions (VS Code Issue)
 
-If you get permission denied errors in VS Code after cloning or editing:
+If you get permission errors while editing files:
 
-\`\`\`bash
+```bash
 sudo chown -R $(whoami):$(whoami) .
 chmod -R u+rw .
-\`\`\`
+```
 
 ---
 
@@ -174,16 +190,14 @@ chmod -R u+rw .
 
 Use LiveKit SDKs:
 
-- React: [\`@livekit/components-react\`](https://docs.livekit.io/client-sdk/react/)
-- JS/TS: [\`@livekit/client\`](https://docs.livekit.io/client-sdk/js/)
+- React: [`@livekit/components-react`](https://docs.livekit.io/client-sdk/react/)
+- JS/TS: [`@livekit/client`](https://docs.livekit.io/client-sdk/js/)
 
-\`\`\`js
+```js
 const room = await connect('wss://your-ip:7881', {
   token: '<generated-token>',
 });
-\`\`\`
-
-Need help building it? Ping me anytime!
+```
 
 ---
 
